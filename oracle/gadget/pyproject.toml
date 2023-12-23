@@ -1,0 +1,25 @@
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+    "Cython>=0.29.17",
+    "numpy"
+    ]
+
+[tool.black]
+line-length = 79
+target_version = ['py37', 'py38', 'py39']
+experimental_string_processing = true
+# force-exclude instead of force makes pre-commit respect this
+force-exclude = '''
+
+(
+  /(
+      \.git          # exclude a few common directories in the
+    | build          # root of the project
+    | dist
+    | doc
+  )/
+  | sumu/validate.py
+)
+'''
