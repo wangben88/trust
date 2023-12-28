@@ -30,12 +30,12 @@ scikit_learn = "^1.3.0"
 scipy = "^1.11.4"
 seaborn = "^0.13.0"
 setuptools = "^68.2.2"
-torch = [
-    {version="2.1.0", source="torch"}
-]
-torch_scatter = [
-    {version="^2.1.0", source="torch_scatter"}
-]
+# torch = [
+#     {version="2.1.0", source="torch"}
+# ]
+# torch_scatter = [
+#     {version="^2.1.0", source="torch_scatter"}
+# ]
 tqdm = "^4.66.1"
 jupyter = "^1.0.0"
 
