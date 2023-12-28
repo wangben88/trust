@@ -77,12 +77,12 @@ class OrderGraph():
                             log=False, **kwargs):
         """
         Construct graph by introducing expand_factors[i] child product nodes for each sum node in sum_layer[i], using
-        function f as the oracle for choosing partitions.
+        a specific splitting strategy specified as a parameter
 
         Args:
             expand_factors (list): List of expansion factors for each layer
-            iterations (list): Number of iterations
-            f: Oracle method, which generates sampled partitions
+            budget (float): the time budget (s) for constructing the graph
+            strategy: Strategy for splitting OrderSPN nodes (e.g. ThresholdStrategy)
             suppress_prints (bool): Whether to suppress prints of the oracle method (which is called many times)
             log (bool): Whether to log progress
             kwargs: Any other arguments to the oracle method
