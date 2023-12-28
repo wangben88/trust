@@ -1,5 +1,5 @@
 from oracle.gadget.sumu.gadget import Score
-from trust.leaf_scores.LeafScore import LeafScore
+from LeafScore import LeafScore
 from tqdm import tqdm
 
 class LeafHandler(Score):
