@@ -6,8 +6,7 @@ from abc import ABC, abstractmethod
 import sys, os
 import scipy.stats as st
 from torch_scatter import scatter, scatter_max
-from torch_scatter.composite import scatter_logsumexp
-from trust.utils.misc import HiddenPrints
+from trust.utils.misc import HiddenPrints, scatter_logsumexp
 
 from torch.optim import Adam
 
