@@ -237,6 +237,30 @@ class OrderSumLayer(NodeLayer):
 
         return nextlayer_index_samples
 
+    def forward_ELBO(self, input):
+        """Performs forward computation of the ELBO while optimizing the weights of the current sum node
+        with softmax function.
+
+        Args:
+            input (Tensor): the input ELBOs into this layer
+
+        Returns:
+            ELBO (Tensor): ELBO of nodes in this layer
+        """
+        weight_entropy = torch.zeros([self.num], dtype = input.dtype) # weight entropy calculates the - sum over w_i log w_i term
+        if self.child_to_sum is not None:
+            for sum_node in range(self.num):
+                indices = ((self.child_to_sum == sum_node).nonzero(as_tuple=True)[0])
+                self.logparams[indices] = torch.log(nn.functional.softmax(input[0, indices], dim = 0))
+                weight_entropy[sum_node] = -torch.sum(self.logparams[indices] * torch.exp(self.logparams[indices]))
+        else:
+            for sum_node in range(self.num):
+                begin_index = sum_node * self.child_per_node
+                end_index = (sum_node + 1) * self.child_per_node
+                self.logparams[begin_index:end_index] = torch.log(nn.functional.softmax(input[0, begin_index:end_index], dim = 0)) # Softmax of the child inputs produces the optimal weights
+                weight_entropy[sum_node] = -torch.sum(self.logparams[begin_index:end_index] * torch.exp(self.logparams[begin_index:end_index]))
+        return self.forward_no_log(input) + weight_entropy #layer.forward_no_log produces the weighted sum of ELBO and then add the weight entropy to get new ELBO
+
 
 
 
@@ -791,26 +815,12 @@ class OrderSPN(nn.Module, ABC):
         with torch.no_grad():
             input = self.leaf_layer.full_summed_scores()
             output = input.clone()
-            softmax = torch.nn.Softmax(dim = 0)
             for layer in self.layers:
                 if isinstance(layer, OrderProdLayer):
                     output = layer.forward(output) # Add ELBOs together in the product node
                 elif isinstance(layer, OrderSumLayer):
-                    weight_entropy = torch.zeros([layer.num], dtype = output.dtype) # weight entropy calculates the - sum over w_i log w_i term
-                    if self.prod_to_sum_layers_map is not None:
-                        for sum_node in range(layer.num):
-                            indices = ((layer.child_to_sum == sum_node).nonzero(as_tuple=True)[0])
-                            layer.logparams[indices] = torch.log(softmax(output[0, indices]))
-                            weight_entropy[sum_node] = -torch.sum(layer.logparams[indices] * torch.exp(layer.logparams[indices]))
-                    else:
-                        for sum_node in range(layer.num):
-                            begin_index = sum_node * layer.child_per_node
-                            end_index = (sum_node + 1) * layer.child_per_node
-                            layer.logparams[begin_index:end_index] = torch.log(softmax(output[0, begin_index:end_index])) # Softmax of the child inputs produces the optimal weights
-                            weight_entropy[sum_node] = -torch.sum(layer.logparams[begin_index:end_index] * torch.exp(layer.logparams[begin_index:end_index]))
-                    output = layer.forward_no_log(output) + weight_entropy #layer.forward_no_log produces the weighted sum of ELBO and then add the weight entropy to get new ELBO
-            loss = -self.forward_vi(input) - self.entropy()
-        return -loss.cpu().detach().numpy()  # ELBO
+                    output = layer.forward_ELBO(output)
+        return output.squeeze().detach().numpy()
 
     ####################################### OrderSPN queries ###############################################
 
