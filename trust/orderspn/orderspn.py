@@ -783,44 +783,43 @@ class OrderSPN(nn.Module, ABC):
             elif isinstance(layer, OrderSumLayer):
                 output = layer.forward_no_log(output)
         return output.squeeze()
-    
-    def learn_spn_adam(self, lr=0.1, epochs=700):
-        """Learns the parameters of the OrderSPN by maximizing the ELBO. The Adam optimizer is used.
+
+    def learn_spn(self, use_adam=False, lr=0.1, epochs=700):
+        """Learns the parameters of the OrderSPN by maximizing the ELBO (by default, uses closed form optimization)
 
         Args:
-            lr (float): Learning rate
-            epochs (int): Number of iterations for the optimizer
-        """
-        self.train()
-        optimizer = Adam(self.parameters(), lr=lr)
-
-        input = self.leaf_layer.full_summed_scores()
-
-        for epoch in range(epochs):
-            self.zero_grad()
-
-            loss = -self.forward_vi(input) - self.entropy()
-            loss.backward()
-
-            optimizer.step()
-
-        return -loss.cpu().detach().numpy()  # ELBO
-
-    def learn_spn(self):
-        """Learns the parameters of the OrderSPN by maximizing the ELBO using closed form optimization.
+            use_adam (bool): whether to use Adam optimizer instead of the default closed form optimization
+            lr (float): Learning rate (only used if using Adam)
+            epochs (int): Number of iterations for the optimizer (only used if using Adam)
 
         Returns:
             ELBO (float): the ELBO of the OrderSPN after learning parameters
         """
-        with torch.no_grad():
+        if not use_adam:
+            with torch.no_grad():
+                input = self.leaf_layer.full_summed_scores()
+                output = input.clone()
+                for layer in self.layers:
+                    if isinstance(layer, OrderProdLayer):
+                        output = layer.forward(output) # Add ELBOs together in the product node
+                    elif isinstance(layer, OrderSumLayer):
+                        output = layer.forward_ELBO(output)
+            return output.squeeze().detach().numpy()
+        else:
+            self.train()
+            optimizer = Adam(self.parameters(), lr=lr)
+
             input = self.leaf_layer.full_summed_scores()
-            output = input.clone()
-            for layer in self.layers:
-                if isinstance(layer, OrderProdLayer):
-                    output = layer.forward(output) # Add ELBOs together in the product node
-                elif isinstance(layer, OrderSumLayer):
-                    output = layer.forward_ELBO(output)
-        return output.squeeze().detach().numpy()
+
+            for epoch in range(epochs):
+                self.zero_grad()
+
+                loss = -self.forward_vi(input) - self.entropy()
+                loss.backward()
+
+                optimizer.step()
+
+            return -loss.cpu().detach().numpy()  # ELBO
 
     ####################################### OrderSPN queries ###############################################
 
