@@ -5,8 +5,8 @@ import torch.nn as nn
 from abc import ABC, abstractmethod
 import sys, os
 import scipy.stats as st
-from torch_scatter import scatter, scatter_max
-from torch_scatter.composite import scatter_logsumexp
+from torch_scatter import scatter, scatter_max, scatter_add
+from torch_scatter.composite import scatter_logsumexp, scatter_log_softmax
 from trust.utils.misc import HiddenPrints
 
 from torch.optim import Adam
@@ -249,16 +249,12 @@ class OrderSumLayer(NodeLayer):
         """
         weight_entropy = torch.zeros([self.num], dtype = input.dtype) # weight entropy calculates the - sum over w_i log w_i term
         if self.child_to_sum is not None:
-            for sum_node in range(self.num):
-                indices = ((self.child_to_sum == sum_node).nonzero(as_tuple=True)[0])
-                self.logparams[indices] = torch.log(nn.functional.softmax(input[0, indices], dim = 0))
-                weight_entropy[sum_node] = -torch.sum(self.logparams[indices] * torch.exp(self.logparams[indices]))
-        else:
-            for sum_node in range(self.num):
-                begin_index = sum_node * self.child_per_node
-                end_index = (sum_node + 1) * self.child_per_node
-                self.logparams[begin_index:end_index] = torch.log(nn.functional.softmax(input[0, begin_index:end_index], dim = 0)) # Softmax of the child inputs produces the optimal weights
-                weight_entropy[sum_node] = -torch.sum(self.logparams[begin_index:end_index] * torch.exp(self.logparams[begin_index:end_index]))
+            indices = self.child_to_sum
+        else: # create a similar child to sum node mapping when there is none
+            indices = torch.repeat_interleave( torch.arange(0, self.num), repeats=self.child_per_node)
+        # use scattering to efficiently calculate the new parameters and the weight entropy term
+        self.logparams = torch.nn.Parameter(torch.flatten(scatter_log_softmax(input, indices, dim = -1)))
+        weight_entropy = scatter_add(-self.logparams*torch.exp(self.logparams), indices)
         return self.forward_no_log(input) + weight_entropy #layer.forward_no_log produces the weighted sum of ELBO and then add the weight entropy to get new ELBO
 
 
