@@ -247,14 +247,13 @@ class OrderSumLayer(NodeLayer):
         Returns:
             ELBO (Tensor): ELBO of nodes in this layer
         """
-        weight_entropy = torch.zeros([self.num], dtype = input.dtype) # weight entropy calculates the - sum over w_i log w_i term
         if self.child_to_sum is not None:
             indices = self.child_to_sum
         else: # create a similar child to sum node mapping when there is none
             indices = torch.repeat_interleave( torch.arange(0, self.num), repeats=self.child_per_node)
         # use scattering to efficiently calculate the new parameters and the weight entropy term
-        self.logparams = torch.nn.Parameter(torch.flatten(scatter_log_softmax(input, indices, dim = -1)))
-        weight_entropy = scatter_add(-self.logparams*torch.exp(self.logparams), indices)
+        self.logparams = torch.nn.Parameter(torch.squeeze(scatter_log_softmax(input, indices, dim = -1)))
+        weight_entropy = scatter_add(-self.logparams*torch.exp(self.logparams), indices) # weight entropy calculates the - sum over w_i log w_i term
         return self.forward_no_log(input) + weight_entropy #layer.forward_no_log produces the weighted sum of ELBO and then add the weight entropy to get new ELBO
 
 
