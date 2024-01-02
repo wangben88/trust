@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 import sys, os
 import scipy.stats as st
 from torch_scatter import scatter, scatter_max
+from torch_scatter.composite import scatter_log_softmax
 from trust.utils.misc import HiddenPrints, scatter_logsumexp
 
 from torch.optim import Adam
@@ -235,6 +236,25 @@ class OrderSumLayer(NodeLayer):
             nextlayer_index_samples = next_layer_candidate_indices[raw_indices]
 
         return nextlayer_index_samples
+
+    def forward_ELBO(self, input):
+        """Performs forward computation of the ELBO while optimizing the weights of the current sum node
+        with softmax function.
+
+        Args:
+            input (Tensor): the input ELBOs into this layer
+
+        Returns:
+            ELBO (Tensor): ELBO of nodes in this layer
+        """
+        if self.child_to_sum is not None:
+            indices = self.child_to_sum
+        else: # create a similar child to sum node mapping when there is none
+            indices = torch.repeat_interleave( torch.arange(0, self.num), repeats=self.child_per_node)
+        # use scattering to efficiently calculate the new parameters and the weight entropy term
+        self.logparams = torch.nn.Parameter(torch.squeeze(scatter_log_softmax(input, indices, dim = -1)))
+        weight_entropy = scatter_add(-self.logparams*torch.exp(self.logparams), indices) # weight entropy calculates the - sum over w_i log w_i term
+        return self.forward_no_log(input) + weight_entropy #layer.forward_no_log produces the weighted sum of ELBO and then add the weight entropy to get new ELBO
 
 
 
@@ -759,27 +779,42 @@ class OrderSPN(nn.Module, ABC):
                 output = layer.forward_no_log(output)
         return output.squeeze()
 
-    def learn_spn(self, lr=0.1, epochs=700):
-        """Learns the parameters of the OrderSPN by maximizing the ELBO. The Adam optimizer is used.
+    def learn_spn(self, use_adam=False, lr=0.1, epochs=700):
+        """Learns the parameters of the OrderSPN by maximizing the ELBO (by default, uses closed form optimization)
 
         Args:
-            lr (float): Learning rate
-            epochs (int): Number of iterations for the optimizer
+            use_adam (bool): whether to use Adam optimizer instead of the default closed form optimization
+            lr (float): Learning rate (only used if using Adam)
+            epochs (int): Number of iterations for the optimizer (only used if using Adam)
+
+        Returns:
+            ELBO (float): the ELBO of the OrderSPN after learning parameters
         """
-        self.train()
-        optimizer = Adam(self.parameters(), lr=lr)
+        if not use_adam:
+            with torch.no_grad():
+                input = self.leaf_layer.full_summed_scores()
+                output = input.clone()
+                for layer in self.layers:
+                    if isinstance(layer, OrderProdLayer):
+                        output = layer.forward(output) # Add ELBOs together in the product node
+                    elif isinstance(layer, OrderSumLayer):
+                        output = layer.forward_ELBO(output)
+            return output.squeeze().detach().numpy()
+        else:
+            self.train()
+            optimizer = Adam(self.parameters(), lr=lr)
 
-        input = self.leaf_layer.full_summed_scores()
+            input = self.leaf_layer.full_summed_scores()
 
-        for epoch in range(epochs):
-            self.zero_grad()
+            for epoch in range(epochs):
+                self.zero_grad()
 
-            loss = -self.forward_vi(input) - self.entropy()
-            loss.backward()
+                loss = -self.forward_vi(input) - self.entropy()
+                loss.backward()
 
-            optimizer.step()
+                optimizer.step()
 
-        return -loss.cpu().detach().numpy()  # ELBO
+            return -loss.cpu().detach().numpy()  # ELBO
 
     ####################################### OrderSPN queries ###############################################
 

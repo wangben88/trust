@@ -34,18 +34,20 @@ def learn_ordergraph(d,
 def learn_orderspn(og,
                    device,
                    leaf_function,
-                   lr,
-                   epochs,
+                   use_adam=False,
+                   lr=0.1,
+                   epochs=700,
                    use_childsum_mapping=False,
                    ):
-    """Learn parameters of OrderSPN (parameter learning).
+    """Learn parameters of OrderSPN (parameter learning), which by default uses closed form optimization.
 
     Args:
         og (OrderGraph): structure of OrderSPN
         device (str): pytorch device (cuda or cpu)
         leaf_function (LeafHandler): implements function f from precomputation, outputting leaf values (derived from data)
-        lr (float): learning rate
-        epochs (int): number of iterations of learning
+        use_adam (bool): whether to use Adam optimizer instead of the default
+        lr (float): Learning rate (only used if using Adam)
+        epochs (int): Number of iterations for the optimizer (only used if using Adam)
 
     Returns:
         ospn: learned OrderSPN
@@ -57,6 +59,6 @@ def learn_orderspn(og,
         ospn = OrderSPN(og.sum_layers, og.prod_layers, device=device, leaf_handler=leaf_function)
     ospn.initialize()
 
-    elbo = ospn.learn_spn(lr=lr, epochs=epochs)
+    elbo = ospn.learn_spn(use_adam=use_adam, lr=lr, epochs=epochs)
 
     return ospn
