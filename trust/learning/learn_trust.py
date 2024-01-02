@@ -39,7 +39,7 @@ def learn_orderspn(og,
                    epochs=700,
                    use_childsum_mapping=False,
                    ):
-    """Learn parameters of OrderSPN (parameter learning) with closed form.
+    """Learn parameters of OrderSPN (parameter learning), which by default uses closed form optimization.
 
     Args:
         og (OrderGraph): structure of OrderSPN
