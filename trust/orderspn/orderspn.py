@@ -5,7 +5,7 @@ import torch.nn as nn
 from abc import ABC, abstractmethod
 import sys, os
 import scipy.stats as st
-from torch_scatter import scatter, scatter_max
+from torch_scatter import scatter, scatter_max, scatter_add
 from torch_scatter.composite import scatter_log_softmax
 from trust.utils.misc import HiddenPrints, scatter_logsumexp
 
