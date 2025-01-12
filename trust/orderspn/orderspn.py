@@ -612,7 +612,7 @@ class OrderLeafLayer(NodeLayer):
 
 
 class OrderSPN(nn.Module, ABC):
-    """Class implementing OrderSPNs.
+    """Class implementing OrderSPNs. Loosely based off the SPN implementation in https://github.com/ermongroup/SPN_Variational_Inference
 
     OrderSPNs deal with tensors of dimension (batch_size, layer_size), where layer_size is the number of
     nodes in the layer.
@@ -799,7 +799,7 @@ class OrderSPN(nn.Module, ABC):
                         output = layer.forward(output) # Add ELBOs together in the product node
                     elif isinstance(layer, OrderSumLayer):
                         output = layer.forward_ELBO(output)
-            return output.squeeze().detach().numpy()
+            return output.squeeze().cpu().detach().numpy()
         else:
             self.train()
             optimizer = Adam(self.parameters(), lr=lr)

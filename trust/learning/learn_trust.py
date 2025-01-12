@@ -37,7 +37,7 @@ def learn_orderspn(og,
                    use_adam=False,
                    lr=0.1,
                    epochs=700,
-                   use_childsum_mapping=False,
+                   use_childsum_mapping=True,
                    ):
     """Learn parameters of OrderSPN (parameter learning), which by default uses closed form optimization.
 
@@ -45,9 +45,10 @@ def learn_orderspn(og,
         og (OrderGraph): structure of OrderSPN
         device (str): pytorch device (cuda or cpu)
         leaf_function (LeafHandler): implements function f from precomputation, outputting leaf values (derived from data)
-        use_adam (bool): whether to use Adam optimizer instead of the default
+        use_adam (bool): whether to use Adam optimizer instead of the default closed-form optimization
         lr (float): Learning rate (only used if using Adam)
         epochs (int): Number of iterations for the optimizer (only used if using Adam)
+        use_childsum_mapping (bool): whether to use an explicit child-sum mapping. if False, the number of variables must be a power of 2
 
     Returns:
         ospn: learned OrderSPN
